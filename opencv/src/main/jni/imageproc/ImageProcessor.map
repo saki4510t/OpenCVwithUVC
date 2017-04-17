@@ -1,0 +1,9 @@
+{
+	global:
+		extern "C++" {
+			publicclass::publicclass*;
+			publicclass::?publicclass*;
+		};
+		publicfunction;
+	local: *;
+};
