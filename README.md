@@ -28,3 +28,8 @@ see the respective files.
 ## How to compile(not ready now)
 
 Note: Just make sure that `local.properties` contains the paths for `sdk.dir` and `ndk.dir`. Or you can set them as enviroment variables of you shell. On some system, you may need add `JAVA_HOME` envairoment valiable that points to JDK directory.  
+
+```
+sdk.dir={path to Android SDK on your storage}
+ndk.dir={path to Android SDK on your storage}
+```
