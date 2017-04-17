@@ -28,8 +28,9 @@
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
 	android:background="#ff000000"
+	android:keepScreenOn="true"
 	tools:context=".MainActivity"
-	tools:ignore="MergeRootFrame">
+	tools:ignore="MergeRootFrame,RtlHardcoded,RtlSymmetry,HardcodedText,ContentDescription">
 
 	<com.serenegiant.widget.UVCCameraTextureView
 		android:id="@+id/camera_view"
@@ -48,6 +49,14 @@
 		android:layout_alignTop="@+id/camera_view"
 		android:src="@drawable/border"/>
 
+	<SurfaceView
+		android:id="@+id/result_view"
+		android:layout_width="320dp"
+		android:layout_height="240dp"
+		android:layout_alignRight="@+id/camera_view"
+		android:layout_alignBottom="@+id/camera_view"
+		android:layout_marginRight="5dp"
+		android:layout_marginBottom="5dp"/>
 	<ToggleButton
 		android:id="@+id/camera_button"
 		android:layout_width="wrap_content"
@@ -67,11 +76,32 @@
 		android:scaleType="centerCrop"
 		android:src="@android:drawable/ic_menu_camera"/>
 
+	<TextView
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		tools:text="cpu:100/100/100"
+		android:id="@+id/cpu_load_textview"
+		android:layout_alignTop="@+id/camera_view"
+		android:layout_alignLeft="@+id/camera_view"
+		android:gravity="center_vertical"
+		android:textSize="@dimen/text_sz_cpu_load"
+		android:textColor="@color/RED"/>
+
+	<TextView
+		android:id="@+id/fps_textview"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:gravity="center_horizontal"
+		android:textSize="@dimen/text_sz_fps"
+		android:textColor="@color/RED"
+		android:layout_below="@+id/cpu_load_textview"
+		android:layout_alignLeft="@+id/camera_view"
+		tools:text="15.3/30.0"/>
+
 	<RelativeLayout
 		android:id="@+id/tools_layout"
-		android:layout_width="match_parent"
+		android:layout_width="wrap_content"
 		android:layout_height="wrap_content"
-		android:layout_alignLeft="@id/camera_view"
 		android:layout_alignRight="@id/camera_view"
 		android:layout_alignTop="@id/camera_view">
 

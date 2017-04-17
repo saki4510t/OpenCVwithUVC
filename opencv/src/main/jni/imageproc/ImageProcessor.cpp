@@ -85,8 +85,8 @@ void ImageProcessor::release(JNIEnv *env) {
 }
 
 /**
- * プロセッシングスレッド開始
- * これはJava側の描画スレッド内から呼ばれる(EGLContextが有るのでOpenGL|ES関係の処理可)
+ * request start image processing
+ * This is called on gl context and you can execute OpenGL|ES functions
  */
 int ImageProcessor::start(const int &width, const int &height) {
 	ENTER();
@@ -108,8 +108,8 @@ int ImageProcessor::start(const int &width, const int &height) {
 }
 
 /**
- * プロセッシングスレッド終了
- * これはJava側の描画スレッド内から呼ばれる(EGLContextが有るのでOpenGL|ES関係の処理可)
+ * request stop image processing
+ * This is called on gl context and you can execute OpenGL|ES functions
  */
 int ImageProcessor::stop() {
 	ENTER();
@@ -124,7 +124,7 @@ int ImageProcessor::stop() {
 			mSync.broadcast();
 		}
 		mMutex.unlock();
-		MARK("プロセッサスレッド終了待ち");
+		MARK("wait for processing thread finishes");
 		if (pthread_join(processor_thread, NULL) != EXIT_SUCCESS) {
 			LOGW("terminate processor thread: pthread_join failed");
 		}
@@ -145,56 +145,69 @@ void ImageProcessor::setResultFrameType(const int &result_frame_type) {
 };
 
 
-/** プロセッシングスレッドの実行関数 */
+/** static member thread function */
 /*private*/
 void *ImageProcessor::processor_thread_func(void *vptr_args) {
 	ENTER();
 
 	ImageProcessor *processor = reinterpret_cast<ImageProcessor *>(vptr_args);
 	if (LIKELY(processor)) {
-		// Java側へアクセスできるようにするためにJavaVMへアタッチする
+		// attach to JavaVM so that ImageProcessor can call method(s) on Java class
 		JavaVM *vm = getVM();
 		CHECK(vm);
 		JNIEnv *env;
 		vm->AttachCurrentThread(&env, NULL);
 		CHECK(env);
 		processor->do_process(env);
-		LOGD("プロセッサループ終了, JavaVMからデタッチする");
+		LOGD("image processing loop finished, detach from JavaVM");
 		vm->DetachCurrentThread();
-		LOGD("デタッチ終了");
+		LOGD("detach finished");
 	}
 
 	PRE_EXIT();
 	pthread_exit(NULL);
 }
 
-/** プロセッシングスレッドの実体 */
+/** actual member thread function */
 /*private*/
 void ImageProcessor::do_process(JNIEnv *env) {
 	ENTER();
 
-	cv::Mat src, bk_result, result;
+	cv::Mat src, result;
 	long last_queued_time_ms;
 
 	for ( ; mIsRunning ; ) {
-		// フレームデータの取得待ち
+		// wait for image
 		cv::Mat frame = getFrame(last_queued_time_ms);
 		if (UNLIKELY(!mIsRunning)) break;
 		if (LIKELY(!frame.empty())) {
 			try {
-//================================================================================
+//--------------------------------------------------------------------------------
+// local copy
+// if you want to pass some parameters while image processing,
+// you should do access control
 				int result_frame_type;
 				mMutex.lock();
 				{
 					result_frame_type = mResultFrameType;
 				}
 				mMutex.unlock();
-// 前処理
-				pre_process(frame, src, bk_result, result_frame_type);
+//--------------------------------------------------------------------------------
+// do something you want
+// for a sample, convert to gray scale and return it as rgba here now.
+				switch (result_frame_type) {
+				default:
+					// convert to gray scale(RGBA->Y)
+					cv::cvtColor(frame, src, cv::COLOR_RGBA2GRAY, 1);
+					// convert gray scale to rgba(for callback)
+					cv::cvtColor(src, result, cv::COLOR_GRAY2RGBA);
+					break;
+				}
 				if (UNLIKELY(!mIsRunning)) break;
-				// do something you want
-				// Java側のコールバックメソッドを呼び出す
+//--------------------------------------------------------------------------------
+// call method on Java class
 				callJavaCallback(env, result, last_queued_time_ms);
+//--------------------------------------------------------------------------------
 			} catch (cv::Exception e) {
 				LOGE("do_process failed:%s", e.msg.c_str());
 				continue;
@@ -220,7 +233,7 @@ int ImageProcessor::callJavaCallback(JNIEnv *env, cv::Mat &result, const long &l
 	if (LIKELY(mIsRunning && fields.callFromNative && mClazz && mWeakThiz)) {
 		jfloatArray detected_array = env->NewFloatArray(RESULT_NUM);
 		env->SetFloatArrayRegion(detected_array, 0, RESULT_NUM, detected);
-		// 解析画像
+		// result image
 		jobject buf_frame = env->NewDirectByteBuffer(result.data, result.total() * result.elemSize());
 		// call method on Java class
 		env->CallStaticVoidMethod(mClazz, fields.callFromNative, mWeakThiz, 0, buf_frame, detected_array);
@@ -246,7 +259,6 @@ static void nativeClassInit(JNIEnv* env, jclass clazz) {
 		LOGW("can't find com.serenegiant.ImageProcessor#callFromNative");
 	}
 	env->ExceptionClear();
-	// ByteBufferがdirectBufferでない時にJava側からbyte[]を取得するためのメソッドidを取得
     jclass byteBufClass = env->FindClass("java/nio/ByteBuffer");
 
 	if (LIKELY(byteBufClass)) {
@@ -286,7 +298,7 @@ static void nativeRelease(JNIEnv *env, jobject thiz,
 	setField_long(env, thiz, "mNativePtr", 0);
 	ImageProcessor *processor = reinterpret_cast<ImageProcessor *>(id_native);
 	if (LIKELY(processor)) {
-		// 終了処理
+		// terminating
 		processor->release(env);
 		SAFE_DELETE(processor);
 	}
@@ -330,8 +342,6 @@ static int nativeHandleFrame(JNIEnv *env, jobject thiz,
 	jint result = -1;
 	ImageProcessor *processor = reinterpret_cast<ImageProcessor *>(id_native);
 	if (LIKELY(processor)) {
-		// フレーム処理
-		// こっちはNative側でglReadPixelsを呼んで画像を読み込んで処理する時
 		result = processor->handleFrame(width, height, tex_name);
 	}
 

@@ -24,30 +24,42 @@
 package com.serenegiant.opencvwithuvc;
 
 import android.animation.Animator;
+import android.graphics.Bitmap;
+import android.graphics.Canvas;
+import android.graphics.Matrix;
 import android.graphics.SurfaceTexture;
+import android.graphics.Typeface;
 import android.hardware.usb.UsbDevice;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.util.Log;
 import android.view.Surface;
+import android.view.SurfaceHolder;
+import android.view.SurfaceView;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnLongClickListener;
 import android.widget.CompoundButton;
 import android.widget.ImageButton;
 import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.widget.ToggleButton;
 
 import com.serenegiant.common.BaseActivity;
+import com.serenegiant.opencv.ImageProcessor;
 import com.serenegiant.usb.CameraDialog;
 import com.serenegiant.usb.USBMonitor;
 import com.serenegiant.usb.USBMonitor.OnDeviceConnectListener;
 import com.serenegiant.usb.USBMonitor.UsbControlBlock;
 import com.serenegiant.usb.UVCCamera;
-import com.serenegiant.usbcameracommon.UVCCameraHandler;
+import com.serenegiant.usbcameracommon.UVCCameraHandlerMultiSurface;
+import com.serenegiant.utils.CpuMonitor;
 import com.serenegiant.utils.ViewAnimationHelper;
-import com.serenegiant.widget.CameraViewInterface;
+import com.serenegiant.widget.UVCCameraTextureView;
+
+import java.nio.ByteBuffer;
+import java.util.Locale;
 
 public final class MainActivity extends BaseActivity implements CameraDialog.CameraDialogParent {
 	private static final boolean DEBUG = true;	// TODO set false on release
@@ -90,11 +102,15 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 	/**
 	 * Handler to execute camera related methods sequentially on private thread
 	 */
-	private UVCCameraHandler mCameraHandler;
+	private UVCCameraHandlerMultiSurface mCameraHandler;
 	/**
 	 * for camera preview display
 	 */
-	private CameraViewInterface mUVCCameraView;
+	private UVCCameraTextureView mUVCCameraView;
+	/**
+	 * for display resulted images
+ 	 */
+	protected SurfaceView mResultView;
 	/**
 	 * for open&start / stop&close camera preview
 	 */
@@ -109,6 +125,11 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 	private View mToolsLayout, mValueLayout;
 	private SeekBar mSettingSeekbar;
 
+	protected ImageProcessor mImageProcessor;
+	private TextView mCpuLoadTv;
+	private TextView mFpsTv;
+	private final CpuMonitor cpuMonitor = new CpuMonitor();
+
 	@Override
 	protected void onCreate(final Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
@@ -119,11 +140,13 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 		mCaptureButton = (ImageButton)findViewById(R.id.capture_button);
 		mCaptureButton.setOnClickListener(mOnClickListener);
 		mCaptureButton.setVisibility(View.INVISIBLE);
-		final View view = findViewById(R.id.camera_view);
-		view.setOnLongClickListener(mOnLongClickListener);
-		mUVCCameraView = (CameraViewInterface)view;
+		
+		mUVCCameraView = (UVCCameraTextureView)findViewById(R.id.camera_view);
+		mUVCCameraView.setOnLongClickListener(mOnLongClickListener);
 		mUVCCameraView.setAspectRatio(PREVIEW_WIDTH / (float)PREVIEW_HEIGHT);
 
+		mResultView = (SurfaceView)findViewById(R.id.result_view);
+		
 		mBrightnessButton = findViewById(R.id.brightness_button);
 		mBrightnessButton.setOnClickListener(mOnClickListener);
 		mContrastButton = findViewById(R.id.contrast_button);
@@ -138,8 +161,15 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 		mValueLayout = findViewById(R.id.value_layout);
 		mValueLayout.setVisibility(View.INVISIBLE);
 
+		mCpuLoadTv = (TextView)findViewById(R.id.cpu_load_textview);
+		mCpuLoadTv.setTypeface(Typeface.MONOSPACE);
+		//
+		mFpsTv = (TextView)findViewById(R.id.fps_textview);
+		mFpsTv.setText(null);
+		mFpsTv.setTypeface(Typeface.MONOSPACE);
+
 		mUSBMonitor = new USBMonitor(this, mOnDeviceConnectListener);
-		mCameraHandler = UVCCameraHandler.createHandler(this, mUVCCameraView,
+		mCameraHandler = UVCCameraHandlerMultiSurface.createHandler(this, mUVCCameraView,
 			USE_SURFACE_ENCODER ? 0 : 1, PREVIEW_WIDTH, PREVIEW_HEIGHT, PREVIEW_MODE);
 	}
 
@@ -148,16 +178,17 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 		super.onStart();
 		if (DEBUG) Log.v(TAG, "onStart:");
 		mUSBMonitor.register();
-		if (mUVCCameraView != null)
-			mUVCCameraView.onResume();
+		queueEvent(mCPUMonitorTask, 1000);
+		runOnUiThread(mFpsTask, 1000);
 	}
 
 	@Override
 	protected void onStop() {
 		if (DEBUG) Log.v(TAG, "onStop:");
+		removeEvent(mCPUMonitorTask);
+		removeFromUiThread(mFpsTask);
+		stopPreview();
 		mCameraHandler.close();
-		if (mUVCCameraView != null)
-			mUVCCameraView.onPause();
 		setCameraButton(false);
 		super.onStop();
 	}
@@ -221,8 +252,7 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 				if (isChecked && !mCameraHandler.isOpened()) {
 					CameraDialog.showDialog(MainActivity.this);
 				} else {
-					mCameraHandler.close();
-					setCameraButton(false);
+					stopPreview();
 				}
 				break;
 			}
@@ -249,6 +279,7 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 	};
 
 	private void setCameraButton(final boolean isOn) {
+		if (DEBUG) Log.v(TAG, "setCameraButton:isOn=" + isOn);
 		runOnUiThread(new Runnable() {
 			@Override
 			public void run() {
@@ -268,18 +299,42 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 		updateItems();
 	}
 
+	private int mPreviewSurfaceId;
 	private void startPreview() {
-		final SurfaceTexture st = mUVCCameraView.getSurfaceTexture();
-		mCameraHandler.startPreview(new Surface(st));
+		if (DEBUG) Log.v(TAG, "startPreview:");
+		mUVCCameraView.resetFps();
+		mCameraHandler.startPreview();
 		runOnUiThread(new Runnable() {
 			@Override
 			public void run() {
-				mCaptureButton.setVisibility(View.VISIBLE);
+				try {
+					final SurfaceTexture st = mUVCCameraView.getSurfaceTexture();
+					if (st != null) {
+						final Surface surface = new Surface(st);
+						mPreviewSurfaceId = surface.hashCode();
+						mCameraHandler.addSurface(mPreviewSurfaceId, surface, false);
+					}
+					mCaptureButton.setVisibility(View.VISIBLE);
+					startImageProcessor(PREVIEW_WIDTH, PREVIEW_HEIGHT);
+				} catch (final Exception e) {
+					Log.w(TAG, e);
+				}
 			}
 		});
 		updateItems();
 	}
 
+	private void stopPreview() {
+		if (DEBUG) Log.v(TAG, "stopPreview:");
+		stopImageProcessor();
+		if (mPreviewSurfaceId != 0) {
+			mCameraHandler.removeSurface(mPreviewSurfaceId);
+			mPreviewSurfaceId = 0;
+		}
+		mCameraHandler.close();
+		setCameraButton(false);
+	}
+	
 	private final OnDeviceConnectListener mOnDeviceConnectListener = new OnDeviceConnectListener() {
 		@Override
 		public void onAttach(final UsbDevice device) {
@@ -301,10 +356,9 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 				queueEvent(new Runnable() {
 					@Override
 					public void run() {
-						mCameraHandler.close();
+						stopPreview();
 					}
 				}, 0);
-				setCameraButton(false);
 				updateItems();
 			}
 		}
@@ -378,7 +432,7 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 
 	private int mSettingMode = -1;
 	/**
-	 * 設定画面を表示
+	 * show setting view
 	 * @param mode
 	 */
 	private final void showSettings(final int mode) {
@@ -410,8 +464,8 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 	}
 
 	/**
-	 * 設定画面を非表示にする
-	 * @param fadeOut trueならばフェードアウトさせる, falseなら即座に非表示にする
+	 * hide setting view
+	 * @param fadeOut
 	 */
 	protected final void hideSetting(final boolean fadeOut) {
 		removeFromUiThread(mSettingHideTask);
@@ -440,12 +494,11 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 	};
 
 	/**
-	 * 設定値変更用のシークバーのコールバックリスナー
+	 * callback listener to change camera control values
 	 */
 	private final SeekBar.OnSeekBarChangeListener mOnSeekBarChangeListener = new SeekBar.OnSeekBarChangeListener() {
 		@Override
 		public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser) {
-			// 設定が変更された時はシークバーの非表示までの時間を延長する
 			if (fromUser) {
 				runOnUiThread(mSettingHideTask, SETTINGS_HIDE_DELAY_MS);
 			}
@@ -457,8 +510,6 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 
 		@Override
 		public void onStopTrackingTouch(final SeekBar seekBar) {
-			// シークバーにタッチして値を変更した時はonProgressChangedへ
-			// 行かないみたいなのでここでも非表示までの時間を延長する
 			runOnUiThread(mSettingHideTask, SETTINGS_HIDE_DELAY_MS);
 			if (isActive() && checkSupportFlag(mSettingMode)) {
 				switch (mSettingMode) {
@@ -506,5 +557,126 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 //			if (DEBUG) Log.v(TAG, "onAnimationStart:");
 		}
 	};
+
+//================================================================================
+	private final Runnable mCPUMonitorTask = new Runnable() {
+		@Override
+		public void run() {
+			if (cpuMonitor.sampleCpuUtilization()) {
+				runOnUiThread(new Runnable() {
+					@Override
+					public void run() {
+						mCpuLoadTv.setText(String.format(Locale.US, "CPU:%3d/%3d/%3d",
+							cpuMonitor.getCpuCurrent(),
+							cpuMonitor.getCpuAvg3(),
+							cpuMonitor.getCpuAvgAll()));
+					}
+				});
+			}
+			queueEvent(this, 1000);
+		}
+	};
+	
+	private final Runnable mFpsTask = new Runnable() {
+		@Override
+		public void run() {
+			float srcFps, resultFps;
+			if (mUVCCameraView != null) {
+				mUVCCameraView.updateFps();
+				srcFps = mUVCCameraView.getFps();
+			} else {
+				srcFps = 0.0f;
+			}
+			if (mImageProcessor != null) {
+				mImageProcessor.updateFps();
+				resultFps = mImageProcessor.getFps();
+			} else {
+				resultFps = 0.0f;
+			}
+			mFpsTv.setText(String.format(Locale.US, "FPS:%4.1f->%4.1f", srcFps, resultFps));
+			runOnUiThread(this, 1000);
+		}
+	};
+
+//================================================================================
+	private volatile boolean mIsRunning;
+	private int mImageProcessorSurfaceId;
+
+	protected void startImageProcessor(final int processing_width, final int processing_height) {
+		if (DEBUG) Log.v(TAG, "startImageProcessor:");
+		mIsRunning = true;
+		if (mImageProcessor == null) {
+			mImageProcessor = new ImageProcessor(PREVIEW_WIDTH, PREVIEW_HEIGHT,	// src size
+				new MyImageProcessorCallback(processing_width, processing_height));	// processing size
+			mImageProcessor.start(processing_width, processing_height);	// processing size
+			final Surface surface = mImageProcessor.getSurface();
+			mImageProcessorSurfaceId = surface != null ? surface.hashCode() : 0;
+			if (mImageProcessorSurfaceId != 0) {
+				mCameraHandler.addSurface(mImageProcessorSurfaceId, surface, false);
+			}
+		}
+	}
+
+	protected void stopImageProcessor() {
+		if (DEBUG) Log.v(TAG, "stopImageProcessor:");
+		if (mImageProcessorSurfaceId != 0) {
+			mCameraHandler.removeSurface(mImageProcessorSurfaceId);
+			mImageProcessorSurfaceId = 0;
+		}
+		if (mImageProcessor != null) {
+			mImageProcessor.release();
+			mImageProcessor = null;
+		}
+	}
+
+	protected class MyImageProcessorCallback implements ImageProcessor.ImageProcessorCallback {
+		private final int width, height;
+		private final Matrix matrix = new Matrix();
+		private Bitmap mFrame;
+		protected MyImageProcessorCallback(final int processing_width, final int processing_height) {
+			width = processing_width;
+			height = processing_height;
+		}
+
+		@Override
+		public void onFrame(final ByteBuffer frame) {
+			if (mResultView != null) {
+				final SurfaceHolder holder = mResultView.getHolder();
+				if ((holder == null)
+					|| (holder.getSurface() == null)
+					|| (frame == null)) return;
+
+				if (mFrame == null) {
+					mFrame = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+					final float scaleX = mResultView.getWidth() / (float)width;
+					final float scaleY = mResultView.getHeight() / (float)height;
+					matrix.reset();
+					matrix.postScale(scaleX, scaleY);
+				}
+				try {
+					frame.clear();
+					mFrame.copyPixelsFromBuffer(frame);
+					final Canvas canvas = holder.lockCanvas();
+					if (canvas != null) {
+						try {
+							canvas.drawBitmap(mFrame, matrix, null);
+						} catch (final Exception e) {
+							Log.w(TAG, e);
+						} finally {
+							holder.unlockCanvasAndPost(canvas);
+						}
+					}
+				} catch (final Exception e) {
+					Log.w(TAG, e);
+				}
+			}
+		}
+
+		@Override
+		public void onResult(final int type, final float[] result) {
+			// do something
+		}
+		
+	}
 
 }

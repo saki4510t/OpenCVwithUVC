@@ -59,7 +59,6 @@ LOCAL_SHARED_LIBRARIES += common
 
 LOCAL_SRC_FILES := \
 	IPBase.cpp \
-	IPPreprocess.cpp \
 	IPFrame.cpp \
 	ImageProcessor.cpp \
 

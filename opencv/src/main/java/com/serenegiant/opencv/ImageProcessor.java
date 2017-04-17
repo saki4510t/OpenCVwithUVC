@@ -43,14 +43,14 @@ import java.lang.ref.WeakReference;
 import java.nio.ByteBuffer;
 
 public class ImageProcessor {
-//	private static final boolean DEBUG = false; // FIXME 実働時はfalseにすること
+//	private static final boolean DEBUG = false; // FIXME set false on production
 	private static final String TAG = ImageProcessor.class.getSimpleName();
 
 	private static final int REQUEST_DRAW = 1;
 	private static final int REQUEST_UPDATE_SIZE = 2;
 
 	/**
-	 * 処理結果を通知するためのコールバックリスナー
+	 * callback listener to notify image processing result
 	 */
 	public interface ImageProcessorCallback {
 		/**
@@ -188,18 +188,20 @@ public class ImageProcessor {
 		return mResultFps.getTotalFps();
 	}
 //================================================================================
-	// 結果映像の種類定数
-	/** 結果映像として元映像を返す */
+	// type of result image(currently these values are just ignored on native side)
+	// should match values on native side.
+	/** result is src image */
 	public static final int RESULT_FRAME_TYPE_SRC = 0;
-	/** 結果映像として処理後映像を返す */
+	/** result is after image processing image */
 	public static final int RESULT_FRAME_TYPE_DST = 1;
-	/** 結果映像として元映像に解析結果を書き込んで返す */
+	/** result is src image with drawing something */
 	public static final int RESULT_FRAME_TYPE_SRC_LINE = 2;
-	/** 結果映像として処理後映像に解析結果を書き込んで返す */
+	/** result is after image processing image with drawing something */
 	public static final int RESULT_FRAME_TYPE_DST_LINE = 3;
 
 	/**
-	 * 結果映像の種類を変更
+	 * request to change result image type
+	 * value is just ignored on native side now
 	 * @param result_frame_type
 	 */
 	public void setResultFrameType(final int result_frame_type) {
@@ -210,7 +212,7 @@ public class ImageProcessor {
 	}
 
 	/**
-	 * 結果映像の種類を取得
+	 * get result image type
 	 * @return
 	 * @throws IllegalStateException
 	 */
@@ -224,7 +226,8 @@ public class ImageProcessor {
 
 //================================================================================
 	/**
-	 * native側からの結果コールバック
+	 * callback method from native side
+	 * never change/remove method name unless you know actually what you do.
 	 * @param weakSelf
 	 * @param type
 	 * @param frame
@@ -246,7 +249,7 @@ public class ImageProcessor {
 	}
 
 	/**
-	 * native側からの結果コールバックの実際の処理
+	 * actual callback method when receive something processing result as float array
 	 * @param result
 	 */
 	private void handleResult(final int type, final float[] result) {
@@ -258,7 +261,7 @@ public class ImageProcessor {
 	}
 
 	/**
-	 * OpenCVで処理した映像を受け取った時の処理
+	 * actual callback method when receive images from native side.
 	 * @param frame
 	 */
 	private void handleOpenCVFrame(final ByteBuffer frame) {
@@ -266,20 +269,15 @@ public class ImageProcessor {
 	}
 
 	private class ProcessingTask extends EglTask {
-		/** 映像をテクスチャとして受け取る時のテクスチャ名(SurfaceTexture生成時/分配描画に使用) */
 		private int mTexId;
-		/** 映像を受け取るtsめのSurfaceTexture */
 		private SurfaceTexture mSourceTexture;
-		/** 映像を受け取るためのSurfaceTextureから取得したSurface */
 		private Surface mSourceSurface;
-		/** mSourceTextureのテクスチャ変換行列 */
 		final float[] mTexMatrix = new float[16];
-		/** ソース映像サイズ */
+		/** size of src images */
 		private final int WIDTH, HEIGHT;
-		/** 映像サイズ */
+		/** size of processing images */
 		private int mVideoWidth, mVideoHeight;
 		private GLDrawer2D mSrcDrawer;
-		// 映像受け取り用
 		private MediaSource mMediaSource;
 
 		public ProcessingTask(final ImageProcessor parent, final int src_width, final int src_height, final int video_width, final int video_height) {
@@ -290,12 +288,10 @@ public class ImageProcessor {
 			mVideoHeight = video_height;
 		}
 
-		/** 映像受け取り用Surfaceを取得 */
 		public Surface getSurface() {
 			return mSourceSurface;
 		}
 
-		/** 映像受け取り用SurfaceTextureを取得 */
 		public SurfaceTexture getSurfaceTexture() {
 			return mSourceTexture;
 		}
@@ -303,8 +299,7 @@ public class ImageProcessor {
 		@SuppressLint("NewApi")
 		@Override
 		protected void onStart() {
-			// ソース映像の描画用
-			mSrcDrawer = new GLDrawer2D(true/*isOES*/);	// GL_TEXTURE_EXTERNAL_OESを使う
+			mSrcDrawer = new GLDrawer2D(true/*isOES*/);	// use GL_TEXTURE_EXTERNAL_OES
 			flipMatrix(true);	// 上下入れ替え
 			mTexId = GLHelper.initTex(ShaderConst.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_NEAREST);
 			mSourceTexture = new SurfaceTexture(mTexId);
@@ -316,7 +311,7 @@ public class ImageProcessor {
 				mSourceTexture.setOnFrameAvailableListener(mOnFrameAvailableListener);
 			}
 			handleResize(mVideoWidth, mVideoHeight);
-			// native側の処理を開始
+			// start image processing on native side
 			nativeStart(mNativePtr, mVideoWidth, mVideoHeight);
 			synchronized (mSync) {
 				isProcessingRunning = true;
@@ -326,7 +321,7 @@ public class ImageProcessor {
 		}
 
 		/**
-		 * 諸般の事情で上下をひっくり返すために射影行列を計算
+		 * calc projection matrix
 		 * @param verticalFlip
 		 */
 		private void flipMatrix(final boolean verticalFlip) {
@@ -349,9 +344,9 @@ public class ImageProcessor {
 				mSync.notifyAll();
 			}
 			makeCurrent();
-			// native側の処理を停止させる
+			// stop image processing on native side
 			nativeStop(mNativePtr);
-			// 破棄処理
+			// release resources
 			mSourceSurface = null;
 			if (mSourceTexture != null) {
 				mSourceTexture.release();
@@ -387,7 +382,7 @@ public class ImageProcessor {
 		}
 
 		/**
-		 * 実際の描画処理(ワーカースレッド上で実行)
+		 * drawing(run on worker thread)
 		 */
 		private void handleDraw() {
 			try {
@@ -398,30 +393,25 @@ public class ImageProcessor {
 				Log.e(TAG, "ProcessingTask#draw:thread id =" + Thread.currentThread().getId(), e);
 				return;
 			}
-			// SurfaceTextureで受け取った画像をプレフィルター用にセット
 			mMediaSource.setSource(mSrcDrawer, mTexId, mTexMatrix);
 			// if you want to apply image effect by OpenGL|ES, execute here
 			mMediaSource.getOutputTexture().bind();
-			// Native側でglReadPixelsを使ってフレームバッファから画像データを取得する
-			// Nexus6Pで直接glReadPixelsを使って読み込むと約5ミリ秒かかる
-			// PBOのピンポンバッファを使うと約1/10の0.5ミリ秒で返ってくる
 			nativeHandleFrame(mNativePtr, mVideoWidth, mVideoHeight, 0);
 			mMediaSource.getOutputTexture().unbind();
-			// 何も描画しないとハングアップする機種があるので塗りつぶす(と言っても1x1だから負荷は気にしなくて良い)
+			// workaround to avoid hung-up
 			makeCurrent();
 			GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT);
 			GLES20.glFlush();
 		}
 
 		/**
-		 * 映像サイズ変更処理(ワーカースレッド上で実行)
+		 * change images side(run on worker thread)
 		 * @param width
 		 * @param height
 		 */
 		private void handleResize(final int width, final int height) {
 			mVideoWidth = width;
 			mVideoHeight = height;
-			// プレフィルタ用
 			if (mMediaSource != null) {
 				mMediaSource.resize(width, height);
 			} else {
@@ -429,42 +419,15 @@ public class ImageProcessor {
 			}
 		}
 
-		/**
-		 * TextureSurfaceで映像を受け取った際のコールバックリスナー
-		 */
 		private final SurfaceTexture.OnFrameAvailableListener
 			mOnFrameAvailableListener = new SurfaceTexture.OnFrameAvailableListener() {
 
 			@Override
 			public void onFrameAvailable(final SurfaceTexture surfaceTexture) {
-				// 前の映像フレームが残っていたらクリアする
 				removeRequest(REQUEST_DRAW);
-				// 新しく処理要求する
 				offer(REQUEST_DRAW);
 			}
 		};
-	}
-
-	/**
-	 * 飽和計算(int)
-	 * @param v
-	 * @param min
-	 * @param max
-	 * @return
-	 */
-	public static final int sat(final int v, final int min, final int max) {
-		return v <= min ? min : (v >= max ? max : v);
-	}
-
-	/**
-	 * 飽和計算(float)
-	 * @param v
-	 * @param min
-	 * @param max
-	 * @return
-	 */
-	public static final float sat(final float v, final float min, final float max) {
-		return v <= min ? min : (v >= max ? max : v);
 	}
 
 	private static boolean isInit;

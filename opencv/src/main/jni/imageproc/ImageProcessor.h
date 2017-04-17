@@ -28,12 +28,11 @@
 #include "Mutex.h"
 #include "Condition.h"
 #include "IPBase.h"
-#include "IPPreprocess.h"
 #include "IPFrame.h"
 
 using namespace android;
 
-class ImageProcessor : virtual public IPPreprocess, virtual public IPFrame {
+class ImageProcessor : virtual public IPFrame {
 private:
 	jobject mWeakThiz;
 	jclass mClazz;
