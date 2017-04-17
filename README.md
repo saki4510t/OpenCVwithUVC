@@ -1,4 +1,4 @@
-UVCCamera
+UVCCamera　/ OpenCVwithUVC
 =========
 
 Sample app to show how to apply image processing to the images
