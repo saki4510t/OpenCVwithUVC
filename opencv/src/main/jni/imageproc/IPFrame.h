@@ -26,8 +26,6 @@
 
 #include <queue>
 #include <vector>
-//#include <GLES2/gl2.h>
-//#include <GLES2/gl2ext.h>
 #include <GLES3/gl3.h>		// API>=18
 #include <GLES3/gl3ext.h>	// API>=18
 #include "opencv2/opencv.hpp"
@@ -35,9 +33,9 @@
 #include "Mutex.h"
 #include "Condition.h"
 
-// キューに入れることができる最大フレーム数
+// max number of frames in frame queue
 #define MAX_QUEUED_FRAMES 1
-// フレームプール中の最大フレーム数
+// max number of frames in frame pool
 #define MAX_POOL_SIZE 2
 
 using namespace android;
@@ -48,12 +46,12 @@ private:
 	mutable Mutex mFrameMutex;
 	mutable Mutex mPoolMutex;
 	Condition mFrameSync;
-	// フレームプール
+	// frame pool
 	std::vector<cv::Mat> mPool;
-	// フレームキュー
+	// frame queue
 	std::queue<cv::Mat> mFrames;
 	long last_queued_time_ms;
-	// glReadPixelsを呼ぶ際のピンポンバッファに使うPBOのバッファ名
+	// PBO name for asynchronous call of glReadPixels
 	GLuint pbo[2];
 	int pbo_ix;
 	int pbo_width, pbo_height;
@@ -63,13 +61,14 @@ protected:
 	virtual ~IPFrame();
 	void initFrame(const int &width, const int &height);
 	void releaseFrame();
-	// フレームプール・フレームキュー関係
+
 	cv::Mat getFrame(long &last_queued_ms);
 	cv::Mat obtainFromPool(const int &width, const int &height);
 	void recycle(cv::Mat &frame);
 	inline const bool canAddFrame() { Mutex::Autolock lock(mFrameMutex);  return mFrames.size() < MAX_QUEUED_FRAMES; };
 	int addFrame(cv::Mat &frame);
 	void clearFrames();
+
 	inline const int width() const { return pbo_width; };
 	inline const int height() const { return pbo_height; };
 public:

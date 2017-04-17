@@ -89,8 +89,8 @@ public class ImageProcessor {
 	 * @param callback
 	 * @throws NullPointerException
 	 */
-	public ImageProcessor(final int src_width, final int src_height, final ImageProcessorCallback callback)
-		throws NullPointerException {
+	public ImageProcessor(final int src_width, final int src_height,
+		final ImageProcessorCallback callback) throws NullPointerException {
 
 		if (callback == null) {
 			throw new NullPointerException("callback should not be null");
@@ -280,7 +280,10 @@ public class ImageProcessor {
 		private GLDrawer2D mSrcDrawer;
 		private MediaSource mMediaSource;
 
-		public ProcessingTask(final ImageProcessor parent, final int src_width, final int src_height, final int video_width, final int video_height) {
+		public ProcessingTask(final ImageProcessor parent,
+			final int src_width, final int src_height,
+			final int video_width, final int video_height) {
+			
 			super(null, 0);
 			WIDTH = src_width;
 			HEIGHT = src_height;
@@ -300,13 +303,14 @@ public class ImageProcessor {
 		@Override
 		protected void onStart() {
 			mSrcDrawer = new GLDrawer2D(true/*isOES*/);	// use GL_TEXTURE_EXTERNAL_OES
-			flipMatrix(true);	// 上下入れ替え
+			flipMatrix(true);	// swap upside-down
 			mTexId = GLHelper.initTex(ShaderConst.GL_TEXTURE_EXTERNAL_OES, GLES20.GL_NEAREST);
 			mSourceTexture = new SurfaceTexture(mTexId);
 			mSourceTexture.setDefaultBufferSize(WIDTH, HEIGHT);
 			mSourceSurface = new Surface(mSourceTexture);
 			if (BuildCheck.isLollipop()) {
-				mSourceTexture.setOnFrameAvailableListener(mOnFrameAvailableListener, mAsyncHandler);
+				mSourceTexture.setOnFrameAvailableListener(
+					mOnFrameAvailableListener, mAsyncHandler);
 			} else {
 				mSourceTexture.setOnFrameAvailableListener(mOnFrameAvailableListener);
 			}
@@ -318,6 +322,9 @@ public class ImageProcessor {
 				mSync.notifyAll();
 			}
 			mResultFps.reset();
+//--------------------------------------------------------------------------------
+// there is gl context and you can use OpenGL|ES functions here
+//--------------------------------------------------------------------------------
 		}
 
 		/**
@@ -343,6 +350,9 @@ public class ImageProcessor {
 				isProcessingRunning = false;
 				mSync.notifyAll();
 			}
+//--------------------------------------------------------------------------------
+// there is gl context and you can use OpenGL|ES functions here
+//--------------------------------------------------------------------------------
 			makeCurrent();
 			// stop image processing on native side
 			nativeStop(mNativePtr);
@@ -363,7 +373,9 @@ public class ImageProcessor {
 		}
 
 		@Override
-		protected Object processRequest(final int request, final int arg1, final int arg2, final Object obj) {
+		protected Object processRequest(final int request,
+			final int arg1, final int arg2, final Object obj) {
+			
 			switch (request) {
 			case REQUEST_DRAW:
 				handleDraw();
@@ -394,7 +406,14 @@ public class ImageProcessor {
 				return;
 			}
 			mMediaSource.setSource(mSrcDrawer, mTexId, mTexMatrix);
-			// if you want to apply image effect by OpenGL|ES, execute here
+//--------------------------------------------------------------------------------
+// there is gl context and you can use OpenGL|ES functions here
+// Most functions on OpenCV is relatively heavy on most of Android devices
+// and please consider to use OpenGL|ES instead of OpenCV
+// You can find some image effect classes in libcommon repository
+// under `com.serenegiant.glutils` and `com.serenegiant.mediaeffect` package.
+//--------------------------------------------------------------------------------
+			// pass image to native side(as cv::mat)
 			mMediaSource.getOutputTexture().bind();
 			nativeHandleFrame(mNativePtr, mVideoWidth, mVideoHeight, 0);
 			mMediaSource.getOutputTexture().unbind();
@@ -446,9 +465,12 @@ public class ImageProcessor {
 	private native long nativeCreate(final WeakReference<ImageProcessor> weakSelf);
 	private native void nativeRelease(final long id_native);
 
-	private static native int nativeStart(final long id_native, final int width, final int height);
+	private static native int nativeStart(final long id_native,
+		final int width, final int height);
 	private static native int nativeStop(final long id_native);
-	private static native int nativeHandleFrame(final long id_native, final int width, final int height, final int tex_name);
-	private static native int nativeSetResultFrameType(final long id_native, final int showDetects);
+	private static native int nativeHandleFrame(final long id_native,
+		final int width, final int height, final int tex_name);
+	private static native int nativeSetResultFrameType(final long id_native,
+		final int showDetects);
 	private static native int nativeGetResultFrameType(final long id_native);
 }

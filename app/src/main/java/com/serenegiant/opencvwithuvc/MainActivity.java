@@ -61,7 +61,9 @@ import com.serenegiant.widget.UVCCameraTextureView;
 import java.nio.ByteBuffer;
 import java.util.Locale;
 
-public final class MainActivity extends BaseActivity implements CameraDialog.CameraDialogParent {
+public final class MainActivity extends BaseActivity
+	implements CameraDialog.CameraDialogParent {
+	
 	private static final boolean DEBUG = true;	// TODO set false on release
 	private static final String TAG = "MainActivity";
 
@@ -246,7 +248,9 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 	private final CompoundButton.OnCheckedChangeListener mOnCheckedChangeListener
 		= new CompoundButton.OnCheckedChangeListener() {
 		@Override
-		public void onCheckedChanged(final CompoundButton compoundButton, final boolean isChecked) {
+		public void onCheckedChanged(
+			final CompoundButton compoundButton, final boolean isChecked) {
+			
 			switch (compoundButton.getId()) {
 			case R.id.camera_button:
 				if (isChecked && !mCameraHandler.isOpened()) {
@@ -335,14 +339,19 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 		setCameraButton(false);
 	}
 	
-	private final OnDeviceConnectListener mOnDeviceConnectListener = new OnDeviceConnectListener() {
+	private final OnDeviceConnectListener mOnDeviceConnectListener
+		= new OnDeviceConnectListener() {
+		
 		@Override
 		public void onAttach(final UsbDevice device) {
-			Toast.makeText(MainActivity.this, "USB_DEVICE_ATTACHED", Toast.LENGTH_SHORT).show();
+			Toast.makeText(MainActivity.this,
+				"USB_DEVICE_ATTACHED", Toast.LENGTH_SHORT).show();
 		}
 
 		@Override
-		public void onConnect(final UsbDevice device, final UsbControlBlock ctrlBlock, final boolean createNew) {
+		public void onConnect(final UsbDevice device,
+			final UsbControlBlock ctrlBlock, final boolean createNew) {
+			
 			if (DEBUG) Log.v(TAG, "onConnect:");
 			mCameraHandler.open(ctrlBlock);
 			startPreview();
@@ -350,7 +359,9 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 		}
 
 		@Override
-		public void onDisconnect(final UsbDevice device, final UsbControlBlock ctrlBlock) {
+		public void onDisconnect(final UsbDevice device,
+			final UsbControlBlock ctrlBlock) {
+			
 			if (DEBUG) Log.v(TAG, "onDisconnect:");
 			if (mCameraHandler != null) {
 				queueEvent(new Runnable() {
@@ -364,7 +375,8 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 		}
 		@Override
 		public void onDettach(final UsbDevice device) {
-			Toast.makeText(MainActivity.this, "USB_DEVICE_DETACHED", Toast.LENGTH_SHORT).show();
+			Toast.makeText(MainActivity.this,
+				"USB_DEVICE_DETACHED", Toast.LENGTH_SHORT).show();
 		}
 
 		@Override
@@ -496,9 +508,13 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 	/**
 	 * callback listener to change camera control values
 	 */
-	private final SeekBar.OnSeekBarChangeListener mOnSeekBarChangeListener = new SeekBar.OnSeekBarChangeListener() {
+	private final SeekBar.OnSeekBarChangeListener mOnSeekBarChangeListener
+		= new SeekBar.OnSeekBarChangeListener() {
+		
 		@Override
-		public void onProgressChanged(final SeekBar seekBar, final int progress, final boolean fromUser) {
+		public void onProgressChanged(final SeekBar seekBar,
+			final int progress, final boolean fromUser) {
+			
 			if (fromUser) {
 				runOnUiThread(mSettingHideTask, SETTINGS_HIDE_DELAY_MS);
 			}
@@ -525,12 +541,16 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 	private final ViewAnimationHelper.ViewAnimationListener
 		mViewAnimationListener = new ViewAnimationHelper.ViewAnimationListener() {
 		@Override
-		public void onAnimationStart(@NonNull final Animator animator, @NonNull final View target, final int animationType) {
+		public void onAnimationStart(@NonNull final Animator animator,
+			@NonNull final View target, final int animationType) {
+			
 //			if (DEBUG) Log.v(TAG, "onAnimationStart:");
 		}
 
 		@Override
-		public void onAnimationEnd(@NonNull final Animator animator, @NonNull final View target, final int animationType) {
+		public void onAnimationEnd(@NonNull final Animator animator,
+			@NonNull final View target, final int animationType) {
+			
 			final int id = target.getId();
 			switch (animationType) {
 			case ViewAnimationHelper.ANIMATION_FADE_IN:
@@ -553,7 +573,9 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 		}
 
 		@Override
-		public void onAnimationCancel(@NonNull final Animator animator, @NonNull final View target, final int animationType) {
+		public void onAnimationCancel(@NonNull final Animator animator,
+			@NonNull final View target, final int animationType) {
+			
 //			if (DEBUG) Log.v(TAG, "onAnimationStart:");
 		}
 	};
@@ -601,7 +623,12 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 //================================================================================
 	private volatile boolean mIsRunning;
 	private int mImageProcessorSurfaceId;
-
+	
+	/**
+	 * start image processing
+	 * @param processing_width
+	 * @param processing_height
+	 */
 	protected void startImageProcessor(final int processing_width, final int processing_height) {
 		if (DEBUG) Log.v(TAG, "startImageProcessor:");
 		mIsRunning = true;
@@ -616,7 +643,10 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 			}
 		}
 	}
-
+	
+	/**
+	 * stop image processing
+	 */
 	protected void stopImageProcessor() {
 		if (DEBUG) Log.v(TAG, "stopImageProcessor:");
 		if (mImageProcessorSurfaceId != 0) {
@@ -628,12 +658,17 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 			mImageProcessor = null;
 		}
 	}
-
+	
+	/**
+	 * callback listener from `ImageProcessor`
+	 */
 	protected class MyImageProcessorCallback implements ImageProcessor.ImageProcessorCallback {
 		private final int width, height;
 		private final Matrix matrix = new Matrix();
 		private Bitmap mFrame;
-		protected MyImageProcessorCallback(final int processing_width, final int processing_height) {
+		protected MyImageProcessorCallback(
+			final int processing_width, final int processing_height) {
+			
 			width = processing_width;
 			height = processing_height;
 		}
@@ -646,6 +681,13 @@ public final class MainActivity extends BaseActivity implements CameraDialog.Cam
 					|| (holder.getSurface() == null)
 					|| (frame == null)) return;
 
+//--------------------------------------------------------------------------------
+// Using SurfaceView and Bitmap to draw resulted images is inefficient way,
+// but functions onOpenCV are relatively heavy and expect slower than source
+// frame rate. So currently just use the way to simply this sample app.
+// If you want to use much efficient way, try to use as same way as
+// UVCCamera class use to receive images from UVC camera.
+//--------------------------------------------------------------------------------
 				if (mFrame == null) {
 					mFrame = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
 					final float scaleX = mResultView.getWidth() / (float)width;

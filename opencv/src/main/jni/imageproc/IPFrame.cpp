@@ -21,11 +21,11 @@
  * folder may have a different license, see the respective files.
 */
 
-#if 1	// デバッグ情報を出さない時は1
+#if 1	// set 0 to enable debug output, otherwise set 1
 	#ifndef LOG_NDEBUG
-		#define	LOG_NDEBUG		// LOGV/LOGD/MARKを出力しない時
+		#define	LOG_NDEBUG		// disable LOGV/LOGD/MARK
 	#endif
-	#undef USE_LOGALL			// 指定したLOGxだけを出力
+	#undef USE_LOGALL			// enable specific LOGx only
 #else
 //	#define USE_LOGALL
 	#define USE_LOGD
@@ -70,11 +70,11 @@ void IPFrame::initFrame(const int &width, const int &height) {
 	Mutex::Autolock lock(mPboMutex);
 
 #if USE_PBO
-	// glReadPixelsに使うピンポンバッファ用PBOの準備
+	// prepare PBOs for glReadPixels
 	pbo_width = width;
 	pbo_height = height;
 	pbo_size = (GLsizeiptr)width * height * 4;
-	// バッファ名を2つ生成
+	// generate 2 PBO
 	glGenBuffers(2, pbo);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo[0]);
 	glBufferData(GL_PIXEL_PACK_BUFFER, pbo_size, NULL, GL_DYNAMIC_READ);
@@ -114,7 +114,7 @@ void IPFrame::releaseFrame() {
 	EXIT();
 }
 
-/** OpenGL|ESのフレームバッファから映像を取得, Java側の描画スレッドから呼ばれる */
+/** get image from frame buffer of OpenGL|ES, call this on drawing thread of Java */
 /*public*/
 int IPFrame::handleFrame(const int &, const int &, const int &) {
 	ENTER();
@@ -126,21 +126,23 @@ int IPFrame::handleFrame(const int &, const int &, const int &) {
 			mPboMutex.unlock();
 			RETURN(1, int);	// dropped
 		}
-		// OpenGLのフレームバッファをMatに読み込んでキューする
+		// re-use cv::Mat
 		frame = obtainFromPool(pbo_width, pbo_height);
 #if USE_PBO
-		const int read_ix = pbo_ix; // 今回読み込むPBOのインデックス
-		const int next_ix = pbo_ix = (pbo_ix + 1) % 2;	// 読み込み要求するPBOのインデックス
-		//　読み込み要求を行うPBOをbind
+		// index of PBO that read now
+		const int read_ix = pbo_ix;
+		// index of PBO to request read(will actually read into memory on next frame
+		const int next_ix = pbo_ix = (pbo_ix + 1) % 2;)
+		//　bind PBO to read asynchronously
 		glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo[next_ix]);
-		// 非同期でPBOへ読み込み要求
+		// request asynchronously read frame buffer into PBO
 		glReadPixels(0, 0, pbo_width, pbo_height, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
-		// 実際にデータを取得するPBOをbind
+		// bind PBO to read image data from PBO
 		glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo[read_ix]);
-		// PBO内のデータにアクセスできるようにマップする
+		// map PBO
 		const uint8_t *read_data = (uint8_t *)glMapBufferRange(GL_PIXEL_PACK_BUFFER, 0, pbo_size, GL_MAP_READ_BIT);
 		if (LIKELY(read_data)) {
-			// ここでコピーする
+			// copy PBO into memory
 			memcpy(frame.data, read_data, pbo_size);
 			glUnmapBuffer(GL_PIXEL_PACK_BUFFER);
 		}
@@ -161,7 +163,7 @@ int IPFrame::handleFrame(const int &, const int &, const int &) {
 }
 
 //================================================================================
-// フレームキュー
+// frame queue
 //================================================================================
 /*protected*/
 void IPFrame::clearFrames() {
@@ -184,7 +186,7 @@ void IPFrame::clearFrames() {
 	EXIT();
 }
 
-/** フレームキューからフレームを取得, フレームキューが空ならブロックする */
+/** get frame, if frame queue is empty, block until ready */
 /*protected*/
 cv::Mat IPFrame::getFrame(long &last_queued_ms) {
 	ENTER();
@@ -205,7 +207,8 @@ cv::Mat IPFrame::getFrame(long &last_queued_ms) {
 	RET(result);
 }
 
-/** フレームプールからフレームを取得, フレームプールが空なら新規に生成する  */
+/** obtain empty frame(cv::Mat) from frame pool,
+  * if frame pool is empty, generate new one  */
 /*protected*/
 cv::Mat IPFrame::obtainFromPool(const int &width, const int &height) {
 	ENTER();
@@ -217,12 +220,12 @@ cv::Mat IPFrame::obtainFromPool(const int &width, const int &height) {
 		frame = mPool.back();
 		mPool.pop_back();
 	}
-	frame.create(height, width, CV_8UC4);	// XXX rows=height, cols=widthなので注意
+	frame.create(height, width, CV_8UC4);	// XXX Note: rows=height, cols=width, as 8 bits RGBA
 
 	RET(frame);
 }
 
-/** フレームプールにフレームを返却する */
+/** return frame into frame pool to recycle/re-use */
 /*protected*/
 void IPFrame::recycle(cv::Mat &frame) {
 	ENTER();
@@ -238,7 +241,9 @@ void IPFrame::recycle(cv::Mat &frame) {
 	EXIT();
 }
 
-/** フレームをキューに追加する. キュー内のフレームが最大数を超えたら先頭をプールに返却する */
+/** append frame to frame queue.
+  * if number of frames in frame queue exceeds limit,
+  * return top of the frame(s) to frame pool */
 /*protected*/
 int IPFrame::addFrame(cv::Mat &frame) {
 	ENTER();
@@ -250,7 +255,7 @@ int IPFrame::addFrame(cv::Mat &frame) {
 	{
 		last_queued_time_ms = getTimeMilliseconds();
 		if (mFrames.size() >= MAX_QUEUED_FRAMES) {
-			// キュー中のフレーム数が最大数を超えたので先頭をプールに返却する
+			// return to frame pool
 			temp = &mFrames.front();
 			mFrames.pop();
 		}

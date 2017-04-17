@@ -42,7 +42,6 @@ private:
 	mutable Mutex mMutex;
 	Condition mSync;
 	pthread_t processor_thread;
-	// 処理スレッドの実行関数
 	static void *processor_thread_func(void *vptr_args);
 	void do_process(JNIEnv *env);
 	int callJavaCallback(JNIEnv *env, cv::Mat &result, const long &last_queued_time_ms);
@@ -51,8 +50,8 @@ public:
 	ImageProcessor(JNIEnv* env, jobject weak_thiz_obj, jclass clazz);
 	virtual ~ImageProcessor();
 	void release(JNIEnv *env);
-	int start(const int &width, const int &height);	// これはJava側の描画スレッド内から呼ばれる(EGLContextが有る)
-	int stop();		// これはJava側の描画スレッド内から呼ばれる(EGLContextが有る)
+	int start(const int &width, const int &height);
+	int stop();
 	inline const bool isRunning() const { return mIsRunning; };
 	void setResultFrameType(const int &result_frame_type);
 	inline const int getResultFrameType() const { return mResultFrameType; };

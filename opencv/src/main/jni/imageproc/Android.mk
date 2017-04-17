@@ -28,7 +28,7 @@ OPENCV_CAMERA_MODULES:=off
 OPENCV_INSTALL_MODULES:=on
 OPENCV_LIB_TYPE:=SHARED
 
-# OpenCV3 (3.10)を使う
+# OpenCV3 (3.20)を使う
 include $(LOCAL_PATH)/../opencv3/OpenCV.mk
 LOCAL_SHARED_LIBRARIES += opencv_java3
 

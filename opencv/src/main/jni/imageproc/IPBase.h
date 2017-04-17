@@ -52,7 +52,6 @@ typedef enum DetectType {
 
 class IPBase {
 protected:
-	// 繰り返し使うのでstaticに生成しておく
 	static const cv::Scalar COLOR_YELLOW;
 	static const cv::Scalar COLOR_GREEN;
 	static const cv::Scalar COLOR_ORANGE;
@@ -67,12 +66,8 @@ protected:
 	virtual ~IPBase();
 
 	static void clear_stringstream(std::stringstream &ss);
-	// RotatedRectを指定線色で描画する
+	// call RotatedRect with specific color
 	static void draw_rect(cv::Mat img, cv::RotatedRect rect, cv::Scalar color);
-	/**
-	 * doubleの引数の符号を返す
-	 * @return 0:引数がゼロの時, -1:引数が負の時, 1:引数が正の時
-	 */
 	static inline int sign(const double v) {
 		return (v > 0) - (v < 0);
 	}

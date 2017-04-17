@@ -21,11 +21,11 @@
  * folder may have a different license, see the respective files.
 */
 
-#if 1	// デバッグ情報を出さない時は1
+#if 1	// set 0 to enable debug output, otherwise set 1
 	#ifndef LOG_NDEBUG
-		#define	LOG_NDEBUG		// LOGV/LOGD/MARKを出力しない時
+		#define	LOG_NDEBUG		// disable LOGV/LOGD/MARK
 	#endif
-	#undef USE_LOGALL			// 指定したLOGxだけを出力
+	#undef USE_LOGALL			// enable specific LOGx only
 #else
 //	#define USE_LOGALL
 	#define USE_LOGD
@@ -46,7 +46,7 @@
 
 struct fields_t {
     jmethodID callFromNative;
-    jmethodID arrayID;	// ByteBufferがdirectBufferでない時にJava側からbyte[]を取得するためのメソッドid
+    jmethodID arrayID;
 };
 static fields_t fields;
 
@@ -137,6 +137,8 @@ int ImageProcessor::stop() {
 void ImageProcessor::setResultFrameType(const int &result_frame_type) {
 	ENTER();
 
+// if you want to pass some parameters while image processing,
+// you should do access control like here.
 	Mutex::Autolock lock(mMutex);
 
 	mResultFrameType = result_frame_type % RESULT_FRAME_TYPE_MAX;
@@ -185,7 +187,7 @@ void ImageProcessor::do_process(JNIEnv *env) {
 //--------------------------------------------------------------------------------
 // local copy
 // if you want to pass some parameters while image processing,
-// you should do access control
+// you should do access control like here.
 				int result_frame_type;
 				mMutex.lock();
 				{
@@ -249,6 +251,8 @@ int ImageProcessor::callJavaCallback(JNIEnv *env, cv::Mat &result, const long &l
 	RETURN(0, int);
 }
 
+//********************************************************************************
+// register native method to Java class
 //********************************************************************************
 static void nativeClassInit(JNIEnv* env, jclass clazz) {
 	ENTER();
@@ -391,7 +395,6 @@ static JNINativeMethod methods[] = {
 
 
 int register_ImageProcessor(JNIEnv *env) {
-	// ネイティブメソッドを登録
 	if (registerNativeMethods(env,
 		"com/serenegiant/opencv/ImageProcessor",
 		methods, NUM_ARRAY_ELEMENTS(methods)) < 0) {
