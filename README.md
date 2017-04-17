@@ -23,3 +23,8 @@ Copyright (c) 2014-2017 saki t_saki@serenegiant.com
 All files in the folder are under this Apache License, Version 2.0.
 Files in the jni/opencv3 folders have a different license,
 see the respective files.
+
+
+## How to compile(not ready now)
+
+Note: Just make sure that `local.properties` contains the paths for `sdk.dir` and `ndk.dir`. Or you can set them as enviroment variables of you shell. On some system, you may need add `JAVA_HOME` envairoment valiable that points to JDK directory.  
