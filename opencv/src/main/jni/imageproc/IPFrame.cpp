@@ -132,7 +132,7 @@ int IPFrame::handleFrame(const int &, const int &, const int &) {
 		// index of PBO that read now
 		const int read_ix = pbo_ix;
 		// index of PBO to request read(will actually read into memory on next frame
-		const int next_ix = pbo_ix = (pbo_ix + 1) % 2;)
+		const int next_ix = pbo_ix = (pbo_ix + 1) % 2;
 		//　bind PBO to read asynchronously
 		glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo[next_ix]);
 		// request asynchronously read frame buffer into PBO
