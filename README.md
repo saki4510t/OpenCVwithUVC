@@ -6,7 +6,7 @@ that came from UVC web camera by OpenCV on non-rooted Android device.
 This app is based on `usbWebCameraTest8` on `UVCCamera` repository
 https://github.com/saki4510t/UVCCamera
 
-Copyright (c) 2014-2017 saki t_saki@serenegiant.com
+Copyright (c) 2014-2018 saki t_saki@serenegiant.com
 
  Licensed under the Apache License, Version 2.0 (the "License");
  you may not use this file except in compliance with the License.
