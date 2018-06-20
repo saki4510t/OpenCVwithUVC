@@ -137,17 +137,17 @@ public final class MainActivity extends BaseActivity
 		super.onCreate(savedInstanceState);
 		if (DEBUG) Log.v(TAG, "onCreate:");
 		setContentView(R.layout.activity_main);
-		mCameraButton = (ToggleButton)findViewById(R.id.camera_button);
+		mCameraButton = findViewById(R.id.camera_button);
 		mCameraButton.setOnCheckedChangeListener(mOnCheckedChangeListener);
-		mCaptureButton = (ImageButton)findViewById(R.id.capture_button);
+		mCaptureButton = findViewById(R.id.capture_button);
 		mCaptureButton.setOnClickListener(mOnClickListener);
 		mCaptureButton.setVisibility(View.INVISIBLE);
 		
-		mUVCCameraView = (UVCCameraTextureView)findViewById(R.id.camera_view);
+		mUVCCameraView = findViewById(R.id.camera_view);
 		mUVCCameraView.setOnLongClickListener(mOnLongClickListener);
 		mUVCCameraView.setAspectRatio(PREVIEW_WIDTH / (float)PREVIEW_HEIGHT);
 
-		mResultView = (SurfaceView)findViewById(R.id.result_view);
+		mResultView = findViewById(R.id.result_view);
 		
 		mBrightnessButton = findViewById(R.id.brightness_button);
 		mBrightnessButton.setOnClickListener(mOnClickListener);
@@ -155,7 +155,7 @@ public final class MainActivity extends BaseActivity
 		mContrastButton.setOnClickListener(mOnClickListener);
 		mResetButton = findViewById(R.id.reset_button);
 		mResetButton.setOnClickListener(mOnClickListener);
-		mSettingSeekbar = (SeekBar)findViewById(R.id.setting_seekbar);
+		mSettingSeekbar = findViewById(R.id.setting_seekbar);
 		mSettingSeekbar.setOnSeekBarChangeListener(mOnSeekBarChangeListener);
 
 		mToolsLayout = findViewById(R.id.tools_layout);
@@ -163,10 +163,10 @@ public final class MainActivity extends BaseActivity
 		mValueLayout = findViewById(R.id.value_layout);
 		mValueLayout.setVisibility(View.INVISIBLE);
 
-		mCpuLoadTv = (TextView)findViewById(R.id.cpu_load_textview);
+		mCpuLoadTv = findViewById(R.id.cpu_load_textview);
 		mCpuLoadTv.setTypeface(Typeface.MONOSPACE);
 		//
-		mFpsTv = (TextView)findViewById(R.id.fps_textview);
+		mFpsTv = findViewById(R.id.fps_textview);
 		mFpsTv.setText(null);
 		mFpsTv.setTypeface(Typeface.MONOSPACE);
 
