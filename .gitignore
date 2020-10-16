@@ -1,0 +1,12 @@
+# idea
+.idea/
+*.iml
+
+.gradle/
+local.properties
+
+# build folders and generated sources
+**/build/
+app/src/main/gen/
+opencv/src/main/libs/
+opencv/src/main/obj/

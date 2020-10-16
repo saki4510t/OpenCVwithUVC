@@ -6,7 +6,7 @@ buildscript {
 		jcenter()
 	}
 	dependencies {
-		classpath 'com.android.tools.build:gradle:3.1.3'
+		classpath "com.android.tools.build:gradle:4.1.0"
 
 		// NOTE: Do not place your application dependencies here; they belong
 		// in the individual module build.gradle files
@@ -28,8 +28,8 @@ task clean(type: Delete) {
 ext {
 	supportLibVersion = '27.1.1'  // variable that can be referenced to keep support libs consistent
 	commonLibVersion= '2.5.1'
-	versionBuildTool = '27.0.3'
-	versionCompiler = 27
+	versionBuildTool = '30.0.2'
+	versionCompiler = 30
 	versionTarget = 23
 	versionNameString = '1.0.0'
 	javaSourceCompatibility = JavaVersion.VERSION_1_7

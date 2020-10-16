@@ -1,1 +1,2 @@
 include ':app', ':libuvccamera-release', ':opencv', ':usbCameraCommon-release'
+rootProject.name = "OpenCVwithUVC"
